@@ -2,8 +2,8 @@
 skyhear.cli — Command-line interface.
 
 Usage:
-    geo-locate --input clip.mp4 --date 2026-09-08 --region bbox:24,-125,50,-66 --top 10 --out results/
-    geo-locate --input clip.wav --date 2026-09-08 --region center:40.0,-105.0,radius_km:300
+    skyhear video.mp4 --region "Los Angeles" --date 2024-05-15 --start-time 14:35:00
+    skyhear audio.wav --region "center:50.08,14.43,radius_km:50" --date 2024-06-10
 """
 
 from __future__ import annotations
@@ -205,7 +205,7 @@ def _parse_region(region_str: str, is_fresh: bool = False):
     "--fresh",
     is_flag=True,
     default=False,
-    help="Use live/recent ADS-B data for clips recorded in the past hour",
+    help="Use live/recent ADS-B data for recordings captured in the past hour",
 )
 @click.option(
     "--region", "-r",
@@ -315,7 +315,7 @@ def main(
     if not input_file:
         raise click.UsageError(
             "Missing input media file. Provide it as an argument or via --input.\n"
-            "Example: skyhear clip.ogg --region '<city-or-country>' --fresh"
+            "Example: skyhear video.mp4 --region '<city-or-country>' --fresh"
         )
 
     # Inspect media file for embedded creation_time

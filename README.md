@@ -6,14 +6,14 @@
 
 ![How Acoustic Doppler Aircraft Geolocation Works](docs/assets/how-it-works.jpg)
 
-1. Jet aircraft produce tonal sound (fan/compressor harmonics)
-2. The **Doppler effect** bends these tones as the plane approaches and recedes
+1. Jet aircraft produce tonal sounds (fan and compressor harmonics)
+2. The **Doppler effect** shifts these frequencies as the aircraft approaches and recedes
 3. The exact shape of the Doppler curve depends on the **receiver's ground position**
-4. By matching observed curves against simulated ones (using ADS-B flight tracks), the recording location can be estimated to ~100–500 m
+4. By matching observed curves against simulated flight paths from ADS-B radar data, the recording location can be triangulated to ~100–500 m
 
 > [!NOTE]
-> **Recording environment & aircraft proximity**:
-> The system works best when audio is recorded **outdoors or near an open window**, where high-frequency engine blade tones (typically 500–2500 Hz) are captured without wall dampening.
+> **Acoustic Environment & Range**:
+> The system works best when audio is recorded outdoors or near an open window, where high-frequency engine tones (500–2500 Hz) are captured without wall dampening.
 > 
 > | Aircraft Altitude | Max Detection Range | Quality |
 > |---|---|---|
@@ -23,96 +23,77 @@
 > 
 > *A single plane flyby constrains position to a ~5–10 km corridor; 2 or more crossing flights triangulate the location down to ~100–500 meters.*
 
-## Installation
-
-Requires **Python 3.12+** and **ffmpeg** installed on your system.
-
-### Recommended: Virtual Environment Setup
-
-Using a dedicated virtual environment ensures all audio processing and scientific dependencies are isolated, and makes the `skyhear` CLI command immediately available without PATH issues.
-
-#### **macOS / Linux:**
-```bash
-# 1. Clone the repository
-git clone https://github.com/pooriababaei/skyhear.git
-cd skyhear
-
-# 2. Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. Install skyhear in editable mode
-pip install -e .
-```
-
-#### **Windows (PowerShell):**
-```powershell
-# 1. Clone the repository
-git clone https://github.com/pooriababaei/skyhear.git
-cd skyhear
-
-# 2. Create and activate a virtual environment
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-
-# 3. Install skyhear in editable mode
-pip install -e .
-```
-*(If PowerShell script execution is restricted, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` first).*
-
 ---
 
-### Running Directly Without Activating
+## Installation
 
-You can also run commands directly through the virtual environment binary or Python's module runner without needing to activate:
+Requires **Python 3.12+** and **[ffmpeg](https://ffmpeg.org/)**.
 
-- **macOS / Linux:**
-  ```bash
-  ./.venv/bin/skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
-  # OR
-  python3 -m skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
-  ```
+```bash
+git clone https://github.com/pooriababaei/skyhear.git
+cd skyhear
+pip install .
+```
 
-- **Windows:**
-  ```powershell
-  .\.venv\Scripts\skyhear.exe clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
-  # OR
-  python -m skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
-  ```
+> **Tip**: You can also install directly without cloning:
+> ```bash
+> pip install git+https://github.com/pooriababaei/skyhear.git
+> ```
+
+---
 
 ## Usage
 
 ```bash
-# Locate a fresh recording made in the past hour
-skyhear clip.mp4 --region "<city-name>" --fresh
-
-# Locate a recording with a known calendar date
-skyhear clip.mp4 --region "<country-or-region>" --date YYYY-MM-DD
-
-# Locate using an explicit center coordinate and search radius
-skyhear clip.mp4 --region "center:<lat>,<lon>,radius_km:<N>" --date YYYY-MM-DD
+skyhear <file> --region <location> [options]
 ```
 
-### Options
+### Examples
 
-| Flag | Description |
-|------|-------------|
-| `<file>` or `--input`, `-i` | Input media file (mp4, mov, wav, ogg, m4a, mp3, etc.) |
-| `--region`, `-r` | Search region: city name (`"<city-name>"`), country/region (`"<country-name>"`), or `center:lat,lon,radius_km:N` |
-| `--fresh` | Use live radar data for recordings made in the past hour (no date needed) |
-| `--date`, `-d` | Recording date (`YYYY-MM-DD`) for historical recordings |
-| `--opensky-user` | *(Optional)* OpenSky Network username (or `OPENSKY_USER` env var) |
-| `--opensky-pass` | *(Optional)* OpenSky Network password (or `OPENSKY_PASS` env var) |
+```bash
+# 1. Past recording with known date and time (recommended for fastest, most accurate match)
+skyhear video.mp4 --region "Los Angeles" --date 2024-05-15 --start-time 14:35:00
 
-### Data Sources & Speed
+# 2. Past recording with auto-detected date (read from video metadata)
+skyhear video.mov --region "Seattle"
 
-- **`--date <YYYY-MM-DD>`**: Automatically streams and extracts true ground-radar traces from open [ADS-B daily archives](https://github.com/adsblol) (supported from 2023 up to yesterday's flights via `globe_history_YYYY`), with automatic fallback to [OpenSky Network](https://opensky-network.org/) if that date's archive is not yet published. For any given date, the first run takes **~15–30 seconds** (extracting regional flights), and subsequent runs for that same date are **instant (0s)** from local disk cache (`~/.skyhear/adsb_cache/`).
-- **`--fresh`**: Pings live regional ADS-B feeds in real time via `adsb.lol` for recordings made within the past hour. Takes **~1–2 seconds** to fetch.
+# 3. Live recording captured within the past hour
+skyhear video.mp4 --region "Vancouver" --fresh
 
-> [!NOTE]
-> Due to [OpenSky Network API limitations](https://openskynetwork.github.io/opensky-api/rest.html) (tracks cut off after 30 days), `skyhear` uses permanent daily GitHub archives so queries are never cut off.
+# 4. Search within a specific radius around coordinates
+skyhear audio.wav --region "center:50.08,14.43,radius_km:50" --date 2024-06-10
 
-## Pipeline
+# 5. Search within a custom bounding box (min_lat, min_lon, max_lat, max_lon)
+skyhear audio.mp3 --region "bbox:49.0,-123.5,49.5,-122.5" --date 2024-05-15
+```
+
+---
+
+## CLI Options
+
+| Option | Description |
+|---|---|
+| `<file>` or `-i`, `--input` | Path to media file (`.mp4`, `.mov`, `.wav`, `.ogg`, `.m4a`, `.mp3`) |
+| `-r`, `--region <name\|coord>` | Target area: city name (`"Prague"`), country (`"Germany"`), `center:lat,lon,radius_km:N`, or `bbox:min_lat,min_lon,max_lat,max_lon` |
+| `-d`, `--date <YYYY-MM-DD>` | Recording date for historical flight lookups (auto-detected from file metadata if omitted) |
+| `--start-time <HH:MM[:SS]>` | Recording start time in regional local time (or UTC). Narrows search window |
+| `--fresh` | Force real-time radar search for recordings captured within the last hour |
+| `-n`, `--top <int>` | Number of top candidate locations to output *(default: `3`)* |
+| `-o`, `--out <dir>` | Directory to save results and spectrogram plots *(default: `results`)* |
+| `--min-duration <sec>` | Minimum acoustic Doppler ridge duration in seconds *(default: `10.0`)* |
+| `--adsb-dir <dir>` | Path to local directory of readsb/tar1090 JSON trace files (offline mode) |
+| `-v`, `-vv` | Verbosity level (`-v` for info, `-vv` for debug) |
+
+---
+
+## Data Sources & Performance
+
+- **Historical Mode (`--date`)**: Automatically streams and extracts true ground-radar traces from open [ADS-B daily archives](https://github.com/adsblol) (supported from 2023 up to yesterday's flights via `globe_history_YYYY`), with automatic fallback to [OpenSky Network](https://opensky-network.org/) if the daily archive is not yet published. The first query for a date downloads and indexes the airspace in **~15–30 seconds**; subsequent runs for that date are **instant (0s)** from local disk cache (`~/.skyhear/adsb_cache/`).
+- **Live Mode (`--fresh`)**: Queries active regional ADS-B receivers via `adsb.lol` and OpenSky for recordings made within the past hour. Returns in **~1–2 seconds**.
+
+---
+
+## Pipeline Architecture
 
 ```
 ┌─────────┐    ┌──────────┐    ┌────────┐    ┌─────────┐    ┌──────────┐    ┌──────────┐
@@ -123,11 +104,11 @@ skyhear clip.mp4 --region "center:<lat>,<lon>,radius_km:<N>" --date YYYY-MM-DD
 └─────────┘    └──────────┘    └────────┘    └─────────┘    └──────────┘    └──────────┘
 ```
 
-## Legal / Ethical
+## Legal & Ethical Use
 
-- Test only on your own recordings or recordings you have permission to analyze
-- Respect ADS-B data providers' terms of service and rate limits
-- Purpose: privacy research and education
+- Test only on your own recordings or recordings you have permission to analyze.
+- Respect ADS-B data providers' terms of service and rate limits.
+- Designed for acoustic geolocation, OSINT verification, and academic research.
 
 ## License
 
