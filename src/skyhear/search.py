@@ -451,17 +451,17 @@ def search_location(
     # Adaptive multi-scale resolution based on bounding box geographic extent
     lat_span = bbox.max_lat - bbox.min_lat
     if lat_span > 10.0:
-        # Continental / Full country scale (e.g. Canada, US, North America)
+        # Continental / Full country scale
         coarse_step = max(config.coarse_grid_deg, 0.15)
         medium_step = max(config.medium_grid_deg, 0.015)
         fine_step = config.fine_grid_deg
     elif lat_span > 2.0:
-        # State / Province scale
+        # Regional / State / Province scale
         coarse_step = max(config.coarse_grid_deg, 0.05)
         medium_step = max(config.medium_grid_deg, 0.005)
         fine_step = config.fine_grid_deg
     else:
-        # City / Metropolitan scale (e.g. Vancouver, Point Grey)
+        # Local / City / Metropolitan scale
         coarse_step = config.coarse_grid_deg
         medium_step = config.medium_grid_deg
         fine_step = config.fine_grid_deg

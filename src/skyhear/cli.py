@@ -42,34 +42,21 @@ def _load_env_file(path: Path | None = None) -> None:
 _load_env_file()
 
 
-KNOWN_METROS: dict[str, tuple[float, float, float]] = {
-    "point grey": (49.265, -123.21, 6.0),
-    "west point grey": (49.265, -123.20, 6.0),
-    "kitsilano": (49.268, -123.16, 6.0),
-    "english bay": (49.286, -123.15, 6.0),
-}
-
-
 def _geocode_name(name: str):
     """
-    Geocode a place name into a geographic BoundingBox using OpenStreetMap Nominatim.
-    Preserves actual municipal, neighbourhood, or regional boundaries with appropriate buffers.
+    Geocode any place name (city, region, country, or neighbourhood) into a
+    geographic BoundingBox using OpenStreetMap Nominatim.
     """
     from .adsb import BoundingBox
-
-    norm = name.lower().strip()
-    if norm in KNOWN_METROS:
-        lat, lon, r_km = KNOWN_METROS[norm]
-        return BoundingBox.from_center_radius(lat, lon, r_km)
 
     import urllib.request
     import urllib.parse
     import json
     try:
-        q = urllib.parse.quote(name)
+        q = urllib.parse.quote(name.strip())
         url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
         req = urllib.request.Request(url, headers={"User-Agent": "skyhear-acoustic/0.1"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             res = json.loads(resp.read().decode())
             if res and len(res) > 0:
                 item = res[0]
@@ -86,23 +73,19 @@ def _geocode_name(name: str):
                     if addresstype in ("country", "state", "province", "region"):
                         return BoundingBox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon)
 
-                    # Municipalities, cities, suburbs, and neighbourhoods:
-                    # If Vancouver, ensure it covers West Point Grey & UBC bluffs out to -123.27
-                    if norm == "vancouver":
-                        min_lon = min(min_lon, -123.27)
-                        max_lat = max(max_lat, 49.32)
-
-                    # Add a 3 km buffer for coastal bluffs and city edges
+                    # For cities, municipalities, neighbourhoods, or local areas:
+                    # Add a standard ~5 km acoustic boundary buffer (0.045 deg) around municipal limits
+                    buffer_deg = 0.045
                     return BoundingBox(
-                        min_lat=max(-90.0, min_lat - 0.02),
-                        max_lat=min(90.0, max_lat + 0.02),
-                        min_lon=max(-180.0, min_lon - 0.03),
-                        max_lon=min(180.0, max_lon + 0.03),
+                        min_lat=max(-90.0, min_lat - buffer_deg),
+                        max_lat=min(90.0, max_lat + buffer_deg),
+                        min_lon=max(-180.0, min_lon - buffer_deg),
+                        max_lon=min(180.0, max_lon + buffer_deg),
                     )
 
                 lat = float(item["lat"])
                 lon = float(item["lon"])
-                return BoundingBox.from_center_radius(lat, lon, 15.0)
+                return BoundingBox.from_center_radius(lat, lon, 25.0)
     except Exception:
         pass
     return None
