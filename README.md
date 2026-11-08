@@ -25,22 +25,72 @@
 
 ## Installation
 
+Requires **Python 3.12+** and **ffmpeg** installed on your system.
+
+### Recommended: Virtual Environment Setup
+
+Using a dedicated virtual environment ensures all audio processing and scientific dependencies are isolated, and makes the `skyhear` CLI command immediately available without PATH issues.
+
+#### **macOS / Linux:**
 ```bash
+# 1. Clone the repository
 git clone https://github.com/pooriababaei/skyhear.git
 cd skyhear
-pip install .
+
+# 2. Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install skyhear in editable mode
+pip install -e .
 ```
 
-Requires **Python 3.12+** and **ffmpeg** installed on your system.
+#### **Windows (PowerShell):**
+```powershell
+# 1. Clone the repository
+git clone https://github.com/pooriababaei/skyhear.git
+cd skyhear
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# 3. Install skyhear in editable mode
+pip install -e .
+```
+*(If PowerShell script execution is restricted, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` first).*
+
+---
+
+### Running Directly Without Activating
+
+You can also run commands directly through the virtual environment binary or Python's module runner without needing to activate:
+
+- **macOS / Linux:**
+  ```bash
+  ./.venv/bin/skyhear clip.mp4 --region "London" --date 2026-06-07
+  # OR
+  python3 -m skyhear clip.mp4 --region "London" --date 2026-06-07
+  ```
+
+- **Windows:**
+  ```powershell
+  .\.venv\Scripts\skyhear.exe clip.mp4 --region "Prague" --date 2026-06-07
+  # OR
+  python -m skyhear clip.mp4 --region "Prague" --date 2026-06-07
+  ```
 
 ## Usage
 
 ```bash
 # Locate a fresh recording made in the past hour
-skyhear clip.mp4 --region "Vancouver" --fresh
+skyhear clip.mp4 --region "Prague" --fresh
 
 # Locate a recording with a known calendar date
-skyhear clip.mp4 --region "North America" --date 2026-06-07
+skyhear clip.mp4 --region "Czech Republic" --date 2026-06-07
+
+# Locate using an explicit center coordinate and search radius
+skyhear clip.mp4 --region "center:49.80,15.47,radius_km:200" --date 2026-06-07
 ```
 
 ### Options
@@ -48,7 +98,7 @@ skyhear clip.mp4 --region "North America" --date 2026-06-07
 | Flag | Description |
 |------|-------------|
 | `<file>` or `--input`, `-i` | Input media file (mp4, mov, wav, ogg, m4a, mp3, etc.) |
-| `--region`, `-r` | Search region: city name (`"Vancouver"`), continental (`"North America"`), or `center:lat,lon,radius_km:N` |
+| `--region`, `-r` | Search region: city name (`"London"`), country/state (`"Czech Republic"`), or `center:lat,lon,radius_km:N` |
 | `--fresh` | Use live radar data for recordings made in the past hour (no date needed) |
 | `--date`, `-d` | Recording date (`YYYY-MM-DD`) for historical recordings |
 | `--opensky-user` | *(Optional)* OpenSky Network username (or `OPENSKY_USER` env var) |
