@@ -73,16 +73,34 @@ skyhear audio.mp3 --region "bbox:49.0,-123.5,49.5,-122.5" --date 2024-05-15
 
 | Option | Description |
 |---|---|
-| `<file>` or `-i`, `--input` | Path to media file (`.mp4`, `.mov`, `.wav`, `.ogg`, `.m4a`, `.mp3`) |
-| `-r`, `--region <name\|coord>` | Target area: city name (`"Prague"`), country (`"Germany"`), `center:lat,lon,radius_km:N`, or `bbox:min_lat,min_lon,max_lat,max_lon` |
+| `<file>` | Path to media file (`.mp4`, `.mov`, `.wav`, `.ogg`, `.m4a`, `.mp3`) |
+| `-r`, `--region <name\|coord>` | Target search area: city name (`"Los Angeles"`), country (`"Germany"`), or coordinates (`"center:lat,lon,radius_km:N"`) |
 | `-d`, `--date <YYYY-MM-DD>` | Recording date for historical flight lookups (auto-detected from file metadata if omitted) |
-| `--start-time <HH:MM[:SS]>` | Recording start time in regional local time (or UTC). Narrows search window |
+| `-t`, `--start-time <HH:MM[:SS]>` | Recording start time in regional local time or UTC |
 | `--fresh` | Force real-time radar search for recordings captured within the last hour |
-| `-n`, `--top <int>` | Number of top candidate locations to output *(default: `3`)* |
-| `-o`, `--out <dir>` | Directory to save results and spectrogram plots *(default: `results`)* |
-| `--min-duration <sec>` | Minimum acoustic Doppler ridge duration in seconds *(default: `10.0`)* |
-| `--adsb-dir <dir>` | Path to local directory of readsb/tar1090 JSON trace files (offline mode) |
+| `-o`, `--out <dir>` | Optional directory to save output files and plots (if omitted, results are only printed to terminal) |
 | `-v`, `-vv` | Verbosity level (`-v` for info, `-vv` for debug) |
+
+---
+
+## Python Library Usage
+
+You can also use `skyhear` directly inside your Python applications:
+
+```python
+import skyhear
+
+# Locate an audio or video recording
+candidates = skyhear.locate(
+    "video.mp4",
+    region="Los Angeles",
+    date="2024-05-15",
+    start_time="14:35:00",
+)
+
+for rank, cand in enumerate(candidates, 1):
+    print(f"#{rank}: ({cand.lat:.6f}, {cand.lon:.6f})")
+```
 
 ---
 

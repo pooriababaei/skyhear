@@ -188,99 +188,54 @@ def _parse_region(region_str: str, is_fresh: bool = False):
 
 
 @click.command()
-@click.argument("audio_file", required=False, type=click.Path(exists=True))
+@click.argument("media_file", required=False, type=click.Path(exists=True))
 @click.option(
-    "--input", "-i",
-    "input_opt",
+    "--region", "-r",
     default=None,
-    type=click.Path(exists=True),
-    help="Input media file (mp4, mov, wav, ogg, mp3, etc.)",
+    help="Target search region (city name, country, or coordinates)",
 )
 @click.option(
     "--date", "-d",
     default=None,
-    help="Recording date in YYYY-MM-DD format (auto-inferred with --fresh)",
+    help="Recording date (YYYY-MM-DD). Auto-detected from file metadata if omitted",
+)
+@click.option(
+    "--start-time", "-t",
+    default=None,
+    help="Recording start time (HH:MM or HH:MM:SS) in local time or UTC",
 )
 @click.option(
     "--fresh",
     is_flag=True,
     default=False,
-    help="Use live/recent ADS-B data for recordings captured in the past hour",
-)
-@click.option(
-    "--region", "-r",
-    default=None,
-    help="Search region: city or country name, bbox:..., or center:lat,lon,radius_km:N",
-)
-@click.option(
-    "--top", "-n",
-    default=3,
-    show_default=True,
-    help="Number of top candidates to return",
+    help="Target media was recorded in the past hour (queries real-time radar feeds)",
 )
 @click.option(
     "--out", "-o",
     "output_dir",
-    default="results",
-    show_default=True,
+    default=None,
     type=click.Path(),
-    help="Output directory for results",
-)
-@click.option(
-    "--start-time",
-    default=None,
-    help="Approximate recording start time in UTC (HH:MM:SS). Helps narrow search.",
-)
-@click.option(
-    "--auto-detect / --manual",
-    default=True,
-    show_default=True,
-    help="Auto-detect ridges (default) or use manual seed picking",
-)
-@click.option(
-    "--min-duration",
-    default=10.0,
-    show_default=True,
-    help="Minimum ridge duration in seconds for Doppler pass detection",
-)
-@click.option(
-    "--adsb-dir",
-    default=None,
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="Path to local directory with readsb / adsb.lol / tar1090 JSON trace files",
-)
-@click.option(
-    "--opensky-user",
-    default=None,
-    envvar="OPENSKY_USER",
-    help="OpenSky Network username (or set OPENSKY_USER env var)",
-)
-@click.option(
-    "--opensky-pass",
-    default=None,
-    envvar="OPENSKY_PASS",
-    help="OpenSky Network password (or set OPENSKY_PASS env var)",
+    help="Directory to save output files (if omitted, results are only printed to terminal)",
 )
 @click.option(
     "-v", "--verbose",
     count=True,
     help="Increase verbosity (-v info, -vv debug)",
 )
+@click.option("--top", "-n", default=3, hidden=True, help="Number of top candidates to return")
+@click.option("--input", "-i", "input_opt", default=None, hidden=True, help="Legacy input file flag")
+@click.option("--adsb-dir", default=None, hidden=True, help="Offline readsb directory")
 def main(
-    audio_file: str | None,
-    input_opt: str | None,
-    date: str | None,
-    fresh: bool,
+    media_file: str | None,
     region: str | None,
-    top: int,
-    output_dir: str,
+    date: str | None,
     start_time: str | None,
-    auto_detect: bool,
-    min_duration: float,
-    adsb_dir: str | None,
-    opensky_user: str | None,
-    opensky_pass: str | None,
+    fresh: bool,
+    output_dir: str | None,
     verbose: int,
+    top: int = 3,
+    input_opt: str | None = None,
+    adsb_dir: str | None = None,
 ):
     """
     Geo-locate a recording by matching aircraft Doppler signatures
@@ -311,10 +266,10 @@ def main(
     from .report import generate_results_json, print_summary
     from .search import SearchConfig, search_location
 
-    input_file = audio_file or input_opt
+    input_file = media_file or input_opt
     if not input_file:
         raise click.UsageError(
-            "Missing input media file. Provide it as an argument or via --input.\n"
+            "Missing input media file. Provide it as an argument.\n"
             "Example: skyhear video.mp4 --region '<city-or-country>' --fresh"
         )
 
@@ -351,8 +306,16 @@ def main(
             "Missing required option '--region' / '-r' (e.g. --region '<city-or-country>')."
         )
 
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
+    temp_dir_ctx = None
+    if output_dir:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        audio_extract_dir = output_path / "audio"
+    else:
+        import tempfile
+        temp_dir_ctx = tempfile.TemporaryDirectory()
+        output_path = None
+        audio_extract_dir = Path(temp_dir_ctx.name)
 
     bbox = _parse_region(region, is_fresh=fresh)
 
@@ -367,7 +330,7 @@ def main(
     region_tz = zoneinfo.ZoneInfo(tz_name)
 
     # === Step 1: Ingest ===
-    ingest_result = extract_audio(input_file, output_dir=output_path / "audio")
+    ingest_result = extract_audio(input_file, output_dir=audio_extract_dir)
     click.echo(f"🎧 Media: {Path(input_file).name} ({ingest_result.duration_seconds:.1f}s)")
 
     # === Step 2: Detect aircraft tones ===
@@ -375,25 +338,20 @@ def main(
     Sxx, times, freqs = compute_spectrogram(audio, sr)
     Sxx_w = spectral_whitening(Sxx)
 
-    # Save spectrogram
-    spec_path = output_path / "spectrogram.png"
-
-    if auto_detect:
-        passes = auto_detect_ridges(Sxx_w, times, freqs, min_ridge_duration_s=min_duration)
-    else:
-        fig = plot_spectrogram(Sxx_w, times, freqs, title="Whitened Spectrogram")
-        fig.savefig(str(spec_path), dpi=150)
-        click.echo(f"   Spectrogram saved to {spec_path}")
-        sys.exit(0)
+    passes = auto_detect_ridges(Sxx_w, times, freqs, min_ridge_duration_s=10.0)
 
     if not passes:
         click.echo("⚠️  No aircraft tones detected.")
+        if temp_dir_ctx is not None:
+            temp_dir_ctx.cleanup()
         sys.exit(1)
 
     click.echo(f"🔍 Acoustic Analysis: Detected {len(passes)} Doppler tone(s)")
-    fig = plot_spectrogram(Sxx_w, times, freqs, passes=passes, title="Detected Passes")
-    fig.savefig(str(spec_path), dpi=150)
-    plt.close(fig)
+    if output_path is not None:
+        spec_path = output_path / "spectrogram.png"
+        fig = plot_spectrogram(Sxx_w, times, freqs, passes=passes, title="Detected Passes")
+        fig.savefig(str(spec_path), dpi=150)
+        plt.close(fig)
 
     # === Step 3: Determine recording time ===
     recording_utc_start = None
@@ -448,6 +406,9 @@ def main(
                     click.echo(f"📅 Using specified date: {date} (file metadata date {file_date} differs)")
 
     # === Step 4: Fetch ADS-B data ===
+    opensky_user = os.getenv("OPENSKY_USER")
+    opensky_pass = os.getenv("OPENSKY_PASS")
+
     if adsb_dir is not None:
         from .adsb import load_readsb_traces_dir
         tracks = load_readsb_traces_dir(adsb_dir, bbox=bbox)
@@ -481,10 +442,14 @@ def main(
         # If historical search finds 0 flights, NEVER fall back to live feeds
         if not tracks:
             click.echo(f"⚠️  No flight tracks found for {date} in the target airspace.")
+            if temp_dir_ctx is not None:
+                temp_dir_ctx.cleanup()
             sys.exit(1)
 
     if not tracks:
         click.echo("⚠️  No matching flight tracks found.")
+        if temp_dir_ctx is not None:
+            temp_dir_ctx.cleanup()
         sys.exit(1)
 
     click.echo(f"✈️  Radar: Loaded {len(tracks)} flight tracks")
@@ -500,6 +465,8 @@ def main(
 
     if not candidates:
         click.echo("⚠️  No candidate locations found.")
+        if temp_dir_ctx is not None:
+            temp_dir_ctx.cleanup()
         sys.exit(1)
 
     # === Step 6: Report ===
@@ -510,38 +477,43 @@ def main(
     else:
         click.echo(f"\n📍 Top {min(top, len(candidates))} candidates:")
     summary = print_summary(candidates, top_n=top)
+    click.echo(summary)
 
-    # Save results
-    results_path = generate_results_json(candidates[:top], output_path / "results.json")
+    if output_path is not None:
+        # Save results
+        results_path = generate_results_json(candidates[:top], output_path / "results.json")
 
-    # Save summary
-    with open(output_path / "summary.txt", "w") as f:
-        f.write(summary)
+        # Save summary
+        with open(output_path / "summary.txt", "w", encoding="utf-8") as f:
+            f.write(summary)
 
-    # Save overlay plot for top candidate
-    try:
-        from .report import plot_overlay
-        tracks_dict = {
-            t.icao24: {
-                "timestamps": t.timestamps,
-                "lat": t.lat,
-                "lon": t.lon,
-                "alt_m": t.alt_m,
+        # Save overlay plot for top candidate
+        try:
+            from .report import plot_overlay
+            tracks_dict = {
+                t.icao24: {
+                    "timestamps": t.timestamps,
+                    "lat": t.lat,
+                    "lon": t.lon,
+                    "alt_m": t.alt_m,
+                }
+                for t in tracks
             }
-            for t in tracks
-        }
-        overlay_fig = plot_overlay(
-            passes=passes,
-            candidate=candidates[0],
-            flight_tracks=tracks_dict,
-            output_path=output_path / "overlay.png",
-        )
-        plt.close(overlay_fig)
-        click.echo(f"   Doppler overlay saved to {output_path / 'overlay.png'}")
-    except Exception as e:
-        logger.warning("Failed to generate overlay plot: %s", e)
+            overlay_fig = plot_overlay(
+                passes=passes,
+                candidate=candidates[0],
+                flight_tracks=tracks_dict,
+                output_path=output_path / "overlay.png",
+            )
+            plt.close(overlay_fig)
+            click.echo(f"   Doppler overlay saved to {output_path / 'overlay.png'}")
+        except Exception as e:
+            logger.warning("Failed to generate overlay plot: %s", e)
 
-    click.echo(f"\n✅ Results saved to {output_path}/")
+        click.echo(f"\n✅ Results saved to {output_path}/")
+    else:
+        if temp_dir_ctx is not None:
+            temp_dir_ctx.cleanup()
 
 
 if __name__ == "__main__":

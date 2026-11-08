@@ -60,3 +60,43 @@ def test_cli_past_date_not_overwritten_by_file_metadata(tmp_path):
 
         # Live feeds must NOT have been called
         assert not mock_live.called
+
+
+def test_skyhear_locate_library_api(tmp_path):
+    import skyhear
+
+    with patch("skyhear.locate.extract_audio") as mock_extract, \
+         patch("skyhear.locate.load_audio") as mock_load, \
+         patch("skyhear.locate.compute_spectrogram") as mock_spec, \
+         patch("skyhear.locate.spectral_whitening"), \
+         patch("skyhear.locate.auto_detect_ridges") as mock_ridges, \
+         patch("skyhear.locate.download_github_traces") as mock_dl, \
+         patch("skyhear.locate.search_location") as mock_search, \
+         patch("av.open") as mock_av:
+
+        mock_container = MagicMock()
+        mock_container.metadata = {}
+        mock_container.streams = []
+        mock_av.return_value = mock_container
+
+        mock_extract.return_value = MagicMock(duration_seconds=10.0, wav_path="/tmp/test.wav")
+        mock_load.return_value = (MagicMock(), 22050)
+        mock_spec.return_value = (MagicMock(), MagicMock(), MagicMock())
+        mock_ridges.return_value = [MagicMock()]
+        mock_dl.return_value = [MagicMock(icao24="abc123", timestamps=[0], lat=[0], lon=[0], alt_m=[1000])]
+
+        cand = MagicMock(lat=34.0, lon=-118.0)
+        mock_search.return_value = [cand]
+
+        video_file = tmp_path / "video.mp4"
+        video_file.write_bytes(b"dummy")
+
+        results = skyhear.locate(
+            str(video_file),
+            region="bbox:30,-120,35,-115",
+            date="2024-05-15",
+        )
+
+        assert len(results) == 1
+        assert results[0].lat == 34.0
+
