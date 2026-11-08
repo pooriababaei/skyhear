@@ -199,3 +199,20 @@ class TestCliRegionParsing:
         assert bbox.min_lon == -168.0 and bbox.max_lon == -52.0
 
 
+class TestSafeUrlOpen:
+    """Test SSL-safe urlopen wrapper."""
+
+    def test_safe_urlopen_fallback_on_ssl_error(self):
+        from unittest.mock import MagicMock, patch
+        from skyhear.adsb import _safe_urlopen
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.side_effect = [
+                Exception("CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate"),
+                MagicMock(status=200),
+            ]
+            resp = _safe_urlopen("https://example.com")
+            assert resp.status == 200
+            assert mock_urlopen.call_count == 2
+
+

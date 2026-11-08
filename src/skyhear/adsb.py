@@ -25,6 +25,26 @@ logger = logging.getLogger(__name__)
 DEFAULT_CACHE_DIR = Path.home() / ".skyhear" / "adsb_cache"
 
 
+def _safe_urlopen(req: urllib.request.Request | str, timeout: float = 10):
+    """Open URL using certifi CA bundle if available, falling back to unverified context on SSL error."""
+    import ssl
+    import urllib.request
+
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        ctx = ssl.create_default_context()
+
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except Exception as exc:
+        if "CERTIFICATE_VERIFY_FAILED" in str(exc) or "certificate verify failed" in str(exc):
+            unverified_ctx = ssl._create_unverified_context()
+            return urllib.request.urlopen(req, timeout=timeout, context=unverified_ctx)
+        raise
+
+
 @dataclass
 class BoundingBox:
     """Geographic bounding box."""
@@ -599,7 +619,7 @@ def download_github_traces(
     logger.info("Looking up GitHub ADS-B archive release (%s): %s", repo_name, tag)
     try:
         req = urllib.request.Request(api_url, headers={"User-Agent": "skyhear/0.1"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with _safe_urlopen(req, timeout=10) as resp:
             release_data = json.loads(resp.read().decode())
     except Exception as exc:
         logger.warning("Could not find GitHub archive for %s: %s", tag, exc)
@@ -633,7 +653,7 @@ def download_github_traces(
                 download_url = asset.get("browser_download_url")
                 try:
                     req_asset = urllib.request.Request(download_url, headers={"User-Agent": "skyhear/0.1"})
-                    with urllib.request.urlopen(req_asset, timeout=120) as resp_asset:
+                    with _safe_urlopen(req_asset, timeout=120) as resp_asset:
                         while chunk := resp_asset.read(1024 * 1024):
                             temp_tar.write(chunk)
                             last_render_bytes += len(chunk)
@@ -879,7 +899,7 @@ def fetch_live_tracks(
     )
     try:
         req = urllib.request.Request(opensky_url, headers={"User-Agent": "skyhear/0.1"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with _safe_urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
             states = data.get("states") or []
             for s in states:
@@ -893,7 +913,7 @@ def fetch_live_tracks(
     adsb_url = f"https://api.adsb.lol/v2/lat/{center_lat:.4f}/lon/{center_lon:.4f}/dist/{radius_nm}"
     try:
         req2 = urllib.request.Request(adsb_url, headers={"User-Agent": "skyhear/0.1"})
-        with urllib.request.urlopen(req2, timeout=8) as resp2:
+        with _safe_urlopen(req2, timeout=8) as resp2:
             data2 = json.loads(resp2.read().decode())
             ac_list = data2.get("ac") or []
             for ac in ac_list:
@@ -933,7 +953,7 @@ def fetch_live_tracks(
                 auth_str = base64.b64encode(f"{username}:{password}".encode()).decode()
                 req_headers["Authorization"] = f"Basic {auth_str}"
             req_trk = urllib.request.Request(trk_url, headers=req_headers)
-            with urllib.request.urlopen(req_trk, timeout=6) as trk_resp:
+            with _safe_urlopen(req_trk, timeout=6) as trk_resp:
                 raw_json = trk_resp.read().decode()
                 trk_data = json.loads(raw_json)
                 track = parse_opensky_track(trk_data)
