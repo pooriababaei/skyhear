@@ -96,7 +96,7 @@ def _parse_region(region_str: str, is_fresh: bool = False):
     Parse a region string into a BoundingBox.
 
     Formats:
-        - Plain English city/area name: "Vancouver", "Seattle", "London"
+        - Plain English city/area name: "Prague", "London", "Berlin"
         - Explicit bbox: "bbox:min_lat,min_lon,max_lat,max_lon"
         - Explicit center: "center:lat,lon,radius_km:50"
     """
@@ -149,7 +149,7 @@ def _parse_region(region_str: str, is_fresh: bool = False):
 
     raise click.BadParameter(
         f"Could not resolve region '{region_str}'. "
-        "Please provide a specific city or area name (e.g. 'Vancouver', 'Seattle'), 'North America', "
+        "Please provide a specific city or area name (e.g. 'Prague', 'London'), 'North America', "
         "bbox:min_lat,min_lon,max_lat,max_lon, or center:lat,lon,radius_km:N"
     )
 
@@ -177,7 +177,7 @@ def _parse_region(region_str: str, is_fresh: bool = False):
 @click.option(
     "--region", "-r",
     default=None,
-    help="Search region: city name (e.g. 'Vancouver', 'Seattle'), bbox:..., or center:lat,lon,radius_km:N",
+    help="Search region: city name (e.g. 'Prague', 'Berlin'), bbox:..., or center:lat,lon,radius_km:N",
 )
 @click.option(
     "--top", "-n",
@@ -282,7 +282,7 @@ def main(
     if not input_file:
         raise click.UsageError(
             "Missing input media file. Provide it as an argument or via --input.\n"
-            "Example: geo-locate clip.ogg --region Vancouver --fresh"
+            "Example: skyhear clip.ogg --region 'Prague' --fresh"
         )
 
     # Inspect media file for embedded creation_time
@@ -313,7 +313,7 @@ def main(
 
     if not region:
         raise click.UsageError(
-            "Missing required option '--region' / '-r' (e.g. --region 'Vancouver')."
+            "Missing required option '--region' / '-r' (e.g. --region 'London')."
         )
 
     output_path = Path(output_dir)

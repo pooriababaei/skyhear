@@ -187,9 +187,9 @@ class TestCliRegionParsing:
     def test_named_city_region(self):
         from skyhear.cli import _parse_region
 
-        bbox = _parse_region("Vancouver")
-        assert bbox.min_lat < 49.25 < bbox.max_lat
-        assert bbox.min_lon < -123.12 < bbox.max_lon
+        bbox = _parse_region("Prague")
+        assert bbox.min_lat < 50.08 < bbox.max_lat
+        assert bbox.min_lon < 14.44 < bbox.max_lon
 
     def test_north_america_full_continent(self):
         from skyhear.cli import _parse_region
