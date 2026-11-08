@@ -42,52 +42,112 @@ def _load_env_file(path: Path | None = None) -> None:
 _load_env_file()
 
 
+# Standard country bounding boxes (WGS-84 min_lat, max_lat, min_lon, max_lon)
+# Provides instant, offline, zero-network fallback resolution for countries worldwide
+COUNTRY_BOUNDS: dict[str, tuple[float, float, float, float]] = {
+    "canada": (41.68, 83.34, -141.00, -52.32),
+    "czech republic": (48.55, 51.06, 12.09, 18.86),
+    "czechia": (48.55, 51.06, 12.09, 18.86),
+    "united states": (24.52, 49.38, -124.78, -66.95),
+    "usa": (24.52, 49.38, -124.78, -66.95),
+    "us": (24.52, 49.38, -124.78, -66.95),
+    "united kingdom": (49.86, 60.86, -8.65, 1.78),
+    "uk": (49.86, 60.86, -8.65, 1.78),
+    "great britain": (49.86, 60.86, -8.65, 1.78),
+    "germany": (47.27, 55.06, 5.87, 15.04),
+    "france": (41.33, 51.09, -5.14, 9.56),
+    "italy": (36.65, 47.09, 6.63, 18.52),
+    "spain": (36.00, 43.79, -9.30, 4.33),
+    "portugal": (36.96, 42.15, -9.53, -6.19),
+    "netherlands": (50.75, 53.55, 3.36, 7.23),
+    "belgium": (49.50, 51.51, 2.55, 6.41),
+    "switzerland": (45.82, 47.81, 5.96, 10.49),
+    "austria": (46.37, 49.02, 9.53, 17.16),
+    "poland": (49.00, 54.84, 14.12, 24.15),
+    "sweden": (55.34, 69.06, 11.03, 24.18),
+    "norway": (57.96, 71.19, 4.50, 31.06),
+    "finland": (59.73, 70.09, 20.55, 31.59),
+    "denmark": (54.56, 57.75, 8.07, 12.69),
+    "ireland": (51.42, 55.38, -10.48, -6.00),
+    "greece": (34.80, 41.75, 19.37, 29.65),
+    "turkey": (35.81, 42.11, 25.66, 44.82),
+    "japan": (24.05, 45.52, 122.93, 153.99),
+    "australia": (-43.63, -10.05, 113.34, 153.64),
+    "new zealand": (-47.29, -34.42, 166.43, 178.58),
+    "mexico": (14.53, 32.72, -118.40, -86.71),
+    "brazil": (-33.75, 5.27, -73.98, -34.79),
+    "argentina": (-55.05, -21.78, -73.58, -53.64),
+    "chile": (-55.98, -17.50, -75.64, -66.42),
+    "india": (6.75, 37.10, 68.16, 97.40),
+    "china": (18.16, 53.56, 73.50, 134.77),
+    "south korea": (33.10, 38.61, 124.60, 131.87),
+}
+
+
 def _geocode_name(name: str):
     """
     Geocode any place name (city, region, country, or neighbourhood) into a
-    geographic BoundingBox using OpenStreetMap Nominatim.
+    geographic BoundingBox using built-in country tables and OpenStreetMap Nominatim.
     """
     from .adsb import BoundingBox
+
+    norm = name.strip().lower()
+    if norm in COUNTRY_BOUNDS:
+        b = COUNTRY_BOUNDS[norm]
+        return BoundingBox(min_lat=b[0], max_lat=b[1], min_lon=b[2], max_lon=b[3])
 
     import urllib.request
     import urllib.parse
     import json
+    import ssl
+
+    # Try default SSL context, fallback to unverified context if local OS certificates missing
+    contexts = [ssl.create_default_context()]
     try:
-        q = urllib.parse.quote(name.strip())
-        url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
-        req = urllib.request.Request(url, headers={"User-Agent": "skyhear-acoustic/0.1"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            res = json.loads(resp.read().decode())
-            if res and len(res) > 0:
-                item = res[0]
-                addresstype = item.get("addresstype", "")
-                raw_bbox = item.get("boundingbox", [])
-
-                if len(raw_bbox) == 4:
-                    min_lat = float(raw_bbox[0])
-                    max_lat = float(raw_bbox[1])
-                    min_lon = float(raw_bbox[2])
-                    max_lon = float(raw_bbox[3])
-
-                    # Large political divisions (countries, states, provinces)
-                    if addresstype in ("country", "state", "province", "region"):
-                        return BoundingBox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon)
-
-                    # For cities, municipalities, neighbourhoods, or local areas:
-                    # Add a standard ~5 km acoustic boundary buffer (0.045 deg) around municipal limits
-                    buffer_deg = 0.045
-                    return BoundingBox(
-                        min_lat=max(-90.0, min_lat - buffer_deg),
-                        max_lat=min(90.0, max_lat + buffer_deg),
-                        min_lon=max(-180.0, min_lon - buffer_deg),
-                        max_lon=min(180.0, max_lon + buffer_deg),
-                    )
-
-                lat = float(item["lat"])
-                lon = float(item["lon"])
-                return BoundingBox.from_center_radius(lat, lon, 25.0)
+        contexts.append(ssl._create_unverified_context())
     except Exception:
         pass
+
+    q = urllib.parse.quote(name.strip())
+    url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
+    req = urllib.request.Request(url, headers={"User-Agent": "skyhear-acoustic/0.1"})
+
+    for ctx in contexts:
+        try:
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                res = json.loads(resp.read().decode())
+                if res and len(res) > 0:
+                    item = res[0]
+                    addresstype = item.get("addresstype", "")
+                    raw_bbox = item.get("boundingbox", [])
+
+                    if len(raw_bbox) == 4:
+                        min_lat = float(raw_bbox[0])
+                        max_lat = float(raw_bbox[1])
+                        min_lon = float(raw_bbox[2])
+                        max_lon = float(raw_bbox[3])
+
+                        # Large political divisions (countries, states, provinces)
+                        if addresstype in ("country", "state", "province", "region"):
+                            return BoundingBox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon)
+
+                        # For cities, municipalities, neighbourhoods, or local areas:
+                        # Add a standard ~5 km acoustic boundary buffer (0.045 deg) around municipal limits
+                        buffer_deg = 0.045
+                        return BoundingBox(
+                            min_lat=max(-90.0, min_lat - buffer_deg),
+                            max_lat=min(90.0, max_lat + buffer_deg),
+                            min_lon=max(-180.0, min_lon - buffer_deg),
+                            max_lon=min(180.0, max_lon + buffer_deg),
+                        )
+
+                    lat = float(item["lat"])
+                    lon = float(item["lon"])
+                    return BoundingBox.from_center_radius(lat, lon, 25.0)
+            break
+        except Exception:
+            continue
+
     return None
 
 
