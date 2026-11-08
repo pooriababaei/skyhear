@@ -68,29 +68,29 @@ You can also run commands directly through the virtual environment binary or Pyt
 
 - **macOS / Linux:**
   ```bash
-  ./.venv/bin/skyhear clip.mp4 --region "London" --date 2026-06-07
+  ./.venv/bin/skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
   # OR
-  python3 -m skyhear clip.mp4 --region "London" --date 2026-06-07
+  python3 -m skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
   ```
 
 - **Windows:**
   ```powershell
-  .\.venv\Scripts\skyhear.exe clip.mp4 --region "Prague" --date 2026-06-07
+  .\.venv\Scripts\skyhear.exe clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
   # OR
-  python -m skyhear clip.mp4 --region "Prague" --date 2026-06-07
+  python -m skyhear clip.mp4 --region "<region-or-city>" --date YYYY-MM-DD
   ```
 
 ## Usage
 
 ```bash
 # Locate a fresh recording made in the past hour
-skyhear clip.mp4 --region "Prague" --fresh
+skyhear clip.mp4 --region "<city-name>" --fresh
 
 # Locate a recording with a known calendar date
-skyhear clip.mp4 --region "Czech Republic" --date 2026-06-07
+skyhear clip.mp4 --region "<country-or-region>" --date YYYY-MM-DD
 
 # Locate using an explicit center coordinate and search radius
-skyhear clip.mp4 --region "center:49.80,15.47,radius_km:200" --date 2026-06-07
+skyhear clip.mp4 --region "center:<lat>,<lon>,radius_km:<N>" --date YYYY-MM-DD
 ```
 
 ### Options
@@ -98,7 +98,7 @@ skyhear clip.mp4 --region "center:49.80,15.47,radius_km:200" --date 2026-06-07
 | Flag | Description |
 |------|-------------|
 | `<file>` or `--input`, `-i` | Input media file (mp4, mov, wav, ogg, m4a, mp3, etc.) |
-| `--region`, `-r` | Search region: city name (`"London"`), country/state (`"Czech Republic"`), or `center:lat,lon,radius_km:N` |
+| `--region`, `-r` | Search region: city name (`"<city-name>"`), country/region (`"<country-name>"`), or `center:lat,lon,radius_km:N` |
 | `--fresh` | Use live radar data for recordings made in the past hour (no date needed) |
 | `--date`, `-d` | Recording date (`YYYY-MM-DD`) for historical recordings |
 | `--opensky-user` | *(Optional)* OpenSky Network username (or `OPENSKY_USER` env var) |
