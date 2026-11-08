@@ -333,6 +333,18 @@ def main(
     ingest_result = extract_audio(input_file, output_dir=audio_extract_dir)
     click.echo(f"🎧 Media: {Path(input_file).name} ({ingest_result.duration_seconds:.1f}s)")
 
+    MIN_DURATION_SECONDS = 30.0
+    if ingest_result.duration_seconds < MIN_DURATION_SECONDS:
+        if temp_dir_ctx is not None:
+            temp_dir_ctx.cleanup()
+        raise click.UsageError(
+            f"Recording is too short ({ingest_result.duration_seconds:.1f}s).\n"
+            f"Acoustic Doppler geolocation requires at least {MIN_DURATION_SECONDS:.0f} seconds of audio "
+            "to capture the aircraft's Closest Point of Approach (CPA) S-curve transition.\n"
+            "Recordings under 30 seconds cannot provide reliable or precise geolocation. "
+            "Please provide a recording of 30 to 90 seconds."
+        )
+
     # === Step 2: Detect aircraft tones ===
     audio, sr = load_audio(ingest_result.wav_path)
     Sxx, times, freqs = compute_spectrogram(audio, sr)

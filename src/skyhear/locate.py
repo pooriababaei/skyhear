@@ -129,6 +129,16 @@ def locate(
     try:
         ingest_result = extract_audio(media_path, output_dir=audio_extract_dir)
 
+        MIN_DURATION_SECONDS = 30.0
+        if ingest_result.duration_seconds < MIN_DURATION_SECONDS:
+            raise ValueError(
+                f"Recording is too short ({ingest_result.duration_seconds:.1f}s). "
+                f"Acoustic Doppler geolocation requires at least {MIN_DURATION_SECONDS:.0f} seconds of audio "
+                "to capture the aircraft's Closest Point of Approach (CPA) S-curve transition. "
+                "Recordings under 30 seconds cannot provide reliable or precise geolocation. "
+                "Please provide a recording of 30 to 90 seconds."
+            )
+
         # Detect aircraft tones
         audio, sr = load_audio(ingest_result.wav_path)
         Sxx, times, freqs = compute_spectrogram(audio, sr)

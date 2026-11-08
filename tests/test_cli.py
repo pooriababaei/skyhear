@@ -34,7 +34,7 @@ def test_cli_past_date_not_overwritten_by_file_metadata(tmp_path):
         mock_container.streams = []
         mock_av.return_value = mock_container
 
-        mock_extract.return_value = MagicMock(duration_seconds=10.0, wav_path="/tmp/test.wav")
+        mock_extract.return_value = MagicMock(duration_seconds=45.0, wav_path="/tmp/test.wav")
         mock_load.return_value = (MagicMock(), 22050)
         mock_spec.return_value = (MagicMock(), MagicMock(), MagicMock())
         mock_ridges.return_value = [MagicMock()]
@@ -79,7 +79,7 @@ def test_skyhear_locate_library_api(tmp_path):
         mock_container.streams = []
         mock_av.return_value = mock_container
 
-        mock_extract.return_value = MagicMock(duration_seconds=10.0, wav_path="/tmp/test.wav")
+        mock_extract.return_value = MagicMock(duration_seconds=45.0, wav_path="/tmp/test.wav")
         mock_load.return_value = (MagicMock(), 22050)
         mock_spec.return_value = (MagicMock(), MagicMock(), MagicMock())
         mock_ridges.return_value = [MagicMock()]
@@ -99,4 +99,54 @@ def test_skyhear_locate_library_api(tmp_path):
 
         assert len(results) == 1
         assert results[0].lat == 34.0
+
+
+def test_cli_rejects_audio_under_30_seconds(tmp_path):
+    runner = CliRunner()
+
+    with patch("skyhear.ingest.extract_audio") as mock_extract, \
+         patch("av.open") as mock_av:
+        mock_container = MagicMock()
+        mock_container.metadata = {}
+        mock_container.streams = []
+        mock_av.return_value = mock_container
+
+        mock_extract.return_value = MagicMock(duration_seconds=23.0, wav_path="/tmp/test.wav")
+
+        video_file = tmp_path / "short.mp4"
+        video_file.write_bytes(b"dummy")
+
+        result = runner.invoke(
+            main,
+            [str(video_file), "--region", "bbox:30,-120,35,-115", "--date", "2024-05-15"],
+        )
+
+        assert result.exit_code != 0
+        assert "Recording is too short (23.0s)" in result.output
+        assert "Acoustic Doppler geolocation requires at least 30 seconds" in result.output
+
+
+def test_locate_rejects_audio_under_30_seconds(tmp_path):
+    import pytest
+    import skyhear
+
+    with patch("skyhear.locate.extract_audio") as mock_extract, \
+         patch("av.open") as mock_av:
+        mock_container = MagicMock()
+        mock_container.metadata = {}
+        mock_container.streams = []
+        mock_av.return_value = mock_container
+
+        mock_extract.return_value = MagicMock(duration_seconds=22.5, wav_path="/tmp/test.wav")
+
+        video_file = tmp_path / "short.mp4"
+        video_file.write_bytes(b"dummy")
+
+        with pytest.raises(ValueError, match="Recording is too short"):
+            skyhear.locate(
+                str(video_file),
+                region="bbox:30,-120,35,-115",
+                date="2024-05-15",
+            )
+
 
