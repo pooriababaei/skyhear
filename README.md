@@ -48,17 +48,22 @@ pip install .
 skyhear <file> --region <location> [options]
 ```
 
+> [!NOTE]
+> **Media Duration Requirements**:
+> - **Minimum:** **30 seconds** (recordings shorter than 30s are rejected as they cannot reliably capture the Doppler S-curve transition).
+> - **Recommended:** **45 to 90 seconds** (optimal window to capture full approaching $\to$ CPA $\to$ receding flybys).
+
 ### Examples
 
 ```bash
 # 1. Past recording with known date and time (recommended for fastest, most accurate match)
-skyhear video.mp4 --region "Los Angeles" --date 2024-05-15 --start-time 14:35:00
+skyhear video.mp4 --region "<region-or-city>" --date 2024-05-15 --start-time 14:35:00
 
 # 2. Past recording with auto-detected date (read from video metadata)
-skyhear video.mov --region "Seattle"
+skyhear video.mov --region "<region-or-city>"
 
 # 3. Live recording captured within the past hour
-skyhear video.mp4 --region "Vancouver" --fresh
+skyhear video.mp4 --region "<region-or-city>" --fresh
 
 # 4. Search within a specific radius around coordinates
 skyhear audio.wav --region "center:50.08,14.43,radius_km:50" --date 2024-06-10
@@ -73,8 +78,8 @@ skyhear audio.mp3 --region "bbox:49.0,-123.5,49.5,-122.5" --date 2024-05-15
 
 | Option | Description |
 |---|---|
-| `<file>` | Path to media file (`.mp4`, `.mov`, `.wav`, `.ogg`, `.m4a`, `.mp3`) |
-| `-r`, `--region <name\|coord>` | Target search area: city name (`"Los Angeles"`), country (`"Germany"`), or coordinates (`"center:lat,lon,radius_km:N"`) |
+| `<file>` | Path to media file (`.mp4`, `.mov`, `.wav`, `.ogg`, `.m4a`, `.mp3`) — **minimum 30s**, **45–90s recommended** |
+| `-r`, `--region <name\|coord>` | Target search area: city/region name (`"<city>"`), country (`"<country>"`), or coordinates (`"center:lat,lon,radius_km:N"`) |
 | `-d`, `--date <YYYY-MM-DD>` | Recording date for historical flight lookups (auto-detected from file metadata if omitted) |
 | `-t`, `--start-time <HH:MM[:SS]>` | Recording start time in regional local time or UTC |
 | `--fresh` | Force real-time radar search for recordings captured within the last hour |
@@ -90,10 +95,10 @@ You can also use `skyhear` directly inside your Python applications:
 ```python
 import skyhear
 
-# Locate an audio or video recording
+# Locate an audio or video recording (minimum 30s audio duration)
 candidates = skyhear.locate(
     "video.mp4",
-    region="Los Angeles",
+    region="<region-or-city>",
     date="2024-05-15",
     start_time="14:35:00",
 )
