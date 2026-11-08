@@ -271,6 +271,4 @@ def print_summary(candidates: list[CandidateLocation], top_n: int = 5) -> str:
         lines.append("")
 
     lines.append("=" * 70)
-    summary = "\n".join(lines)
-    print(summary)
-    return summary
+    return "\n".join(lines)
