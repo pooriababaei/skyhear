@@ -176,22 +176,12 @@ def fetch_opensky_tracks(
                 data = resp.json()
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
-                logger.warning("Rate limited, waiting 10s...")
-                time.sleep(10)
-                continue
-            elif exc.response.status_code == 403:
-                if not auth:
-                    raise click.ClickException(
-                        "OpenSky returned HTTP 403 (Forbidden).\n"
-                        "OpenSky's REST API blocks unauthenticated queries for historical dates.\n"
-                        "To fix this, either:\n"
-                        "  1. Register a free account at https://opensky-network.org and pass "
-                        "--opensky-user <user> --opensky-pass <pass> (or set OPENSKY_USER in .env)\n"
-                        "  2. Use --fresh for clips recorded in the past hour\n"
-                        "  3. Use --adsb-dir <dir> if you have local readsb/tar1090 JSON logs"
-                    )
-                raise
-            raise
+                logger.warning("OpenSky rate limited (429), skipping...")
+                break
+            elif exc.response.status_code in (401, 403):
+                logger.debug("OpenSky returned HTTP %d (no credentials or forbidden); skipping OpenSky.", exc.response.status_code)
+                break
+            break
         except httpx.RequestError as exc:
             logger.warning("Request error at hour %d: %s", hour_offset, exc)
             continue
