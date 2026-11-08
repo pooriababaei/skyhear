@@ -329,6 +329,8 @@ def main(
     except Exception:
         pass
 
+    user_date_provided = bool(date)
+
     # If the user did not specify --date or --fresh, auto-extract from file
     if not date and not fresh:
         if file_utc_datetime is not None:
@@ -419,26 +421,37 @@ def main(
             click.echo(f"⏱️  Time: ~{rec_dt.strftime('%H:%M:%S UTC')} (live)")
     else:
         if file_utc_datetime is not None:
-            recording_utc_start = file_utc_datetime.timestamp()
-            # The container creation_time is already strictly in UTC!
-            # Align archive date with true UTC date from file
-            date = file_utc_datetime.strftime("%Y-%m-%d")
             local_dt = file_utc_datetime.astimezone(region_tz)
             is_video = any(s.type == "video" for s in container.streams)
             source_label = "video" if is_video else "audio"
-            click.echo(
-                f"⏱️  Time: {file_utc_datetime.strftime('%H:%M:%S UTC')} "
-                f"({local_dt.strftime('%H:%M:%S')} {tz_name}) from {source_label} metadata"
-            )
+
+            if not user_date_provided:
+                recording_utc_start = file_utc_datetime.timestamp()
+                # The container creation_time is already strictly in UTC!
+                # Align archive date with true UTC date from file
+                date = file_utc_datetime.strftime("%Y-%m-%d")
+                click.echo(
+                    f"⏱️  Time: {file_utc_datetime.strftime('%H:%M:%S UTC')} "
+                    f"({local_dt.strftime('%H:%M:%S')} {tz_name}) from {source_label} metadata"
+                )
+            else:
+                # User provided an explicit --date.
+                # If file container date matches user's date, use the time of day:
+                file_date = file_utc_datetime.strftime("%Y-%m-%d")
+                if file_date == date:
+                    recording_utc_start = file_utc_datetime.timestamp()
+                    click.echo(
+                        f"⏱️  Time: {file_utc_datetime.strftime('%H:%M:%S UTC')} "
+                        f"({local_dt.strftime('%H:%M:%S')} {tz_name}) from {source_label} metadata"
+                    )
+                else:
+                    click.echo(f"📅 Using specified date: {date} (file metadata date {file_date} differs)")
 
     # === Step 4: Fetch ADS-B data ===
-    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    is_today = (date == today_utc)
-
     if adsb_dir is not None:
         from .adsb import load_readsb_traces_dir
         tracks = load_readsb_traces_dir(adsb_dir, bbox=bbox)
-    elif fresh or is_today:
+    elif fresh:
         from .adsb import fetch_live_tracks
         tracks = fetch_live_tracks(
             bbox=bbox,
